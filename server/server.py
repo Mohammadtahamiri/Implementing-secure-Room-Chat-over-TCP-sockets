@@ -1,20 +1,42 @@
 import socket
 import ssl
 import threading
-from database import init_db, register_user, authenticate_user, log_message
+import time
+from database import init_db, register_user, authenticate_user, log_message, log_connection, get_admin_logs
 
 HOST = '127.0.0.1'
 PORT = 12345
+CLIENT_TIMEOUT = 120
+SPAM_LIMIT_SECONDS = 0.5
 
 clients = {}
 
+def broadcast(message, sender_user=None):
+    for user, sock in list(clients.items()):
+        if user != sender_user:
+            try:
+                sock.sendall((message + "\n").encode('utf-8'))
+            except:
+                sock.close()
+                del clients[user]
+
 def handle_client(client_socket, client_address):
+    client_ip = client_address[0]
     current_user = None
+    last_msg_time = 0
+    
+    client_socket.settimeout(CLIENT_TIMEOUT)
+
     try:
         client_socket.sendall(b"AUTH_REQUIRED\n")
         
         while not current_user:
-            data = client_socket.recv(1024).decode('utf-8').strip()
+            try:
+                data = client_socket.recv(1024).decode('utf-8').strip()
+            except socket.timeout:
+                client_socket.sendall(b"TIMEOUT: Authentication timed out.\n")
+                return
+
             if not data:
                 return
             
@@ -34,32 +56,57 @@ def handle_client(client_socket, client_address):
                     current_user = username
                     clients[current_user] = client_socket
                     client_socket.sendall(b"LOGIN_SUCCESS\n")
+                    
+                    log_connection(current_user, client_ip, "LOGIN")
+                    broadcast(f"[SYSTEM]: {current_user} joined the chat.", current_user)
                 else:
                     client_socket.sendall(b"LOGIN_FAILED\n")
             else:
                 client_socket.sendall(b"INVALID_COMMAND\n")
 
         while True:
-            msg = client_socket.recv(1024).decode('utf-8')
-            if not msg:
-                break
-            
-            log_message(current_user, msg.strip())
-            broadcast_msg = f"[{current_user}]: {msg}"
-            
-            for user, sock in list(clients.items()):
-                if user != current_user:
-                    try:
-                        sock.sendall(broadcast_msg.encode('utf-8'))
-                    except:
-                        sock.close()
-                        del clients[user]
+            try:
+                msg = client_socket.recv(1024).decode('utf-8')
+                if not msg:
+                    break
+                
+                msg_str = msg.strip()
 
-    except Exception:
-        pass
+                current_time = time.time()
+                if current_time - last_msg_time < SPAM_LIMIT_SECONDS:
+                    client_socket.sendall(b"[SYSTEM WARNING]: You are sending messages too fast! (Anti-Spam)\n")
+                    continue
+                last_msg_time = current_time
+
+                if msg_str.upper() == "LIST":
+                    active_users = ", ".join(clients.keys())
+                    client_socket.sendall(f"[SYSTEM]: Online Users: {active_users}\n".encode('utf-8'))
+                    continue
+
+                if msg_str.upper() == "ADMIN_LOGS":
+                    if current_user == "admin":
+                        logs = get_admin_logs()
+                        log_res = "\n--- ADMIN LOGS ---\n" + "\n".join([str(l) for l in logs]) + "\n"
+                        client_socket.sendall(log_res.encode('utf-8'))
+                    else:
+                        client_socket.sendall(b"[SYSTEM]: Access Denied. Admin only.\n")
+                    continue
+
+                log_message(current_user, msg_str)
+                broadcast(f"[{current_user}]: {msg_str}", current_user)
+
+            except socket.timeout:
+                print(f"[-] Client {current_user} timed out due to inactivity.")
+                client_socket.sendall(b"[SYSTEM]: Disconnected due to inactivity (Timeout).\n")
+                break
+
+    except Exception as e:
+        print(f"Error: {e}")
     finally:
         if current_user and current_user in clients:
             del clients[current_user]
+            log_connection(current_user, client_ip, "LOGOUT")
+            broadcast(f"[SYSTEM]: {current_user} left the chat.")
         client_socket.close()
 
 def start_server():
