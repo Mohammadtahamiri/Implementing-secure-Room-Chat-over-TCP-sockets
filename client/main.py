@@ -20,14 +20,29 @@ def main() -> None:
         client_socket = create_connection()
         print("Connected successfully.")
 
-        username, password = get_credentials()
-        auth_message = build_auth_message(username, password)
-
-        client_socket.sendall(encode_message(auth_message))
-
         response = client_socket.recv(BUFFER_SIZE)
         print("Server:", decode_message(response))
 
+        username, password = get_credentials()
+
+        register_message = f"REGISTER {username} {password}"
+        client_socket.sendall(encode_message(register_message))
+
+        response = client_socket.recv(BUFFER_SIZE)
+        register_response = decode_message(response)
+        print("Server:", register_response)
+
+        login_message = f"LOGIN {username} {password}"
+        client_socket.sendall(encode_message(login_message))
+
+        response = client_socket.recv(BUFFER_SIZE)
+        login_response = decode_message(response).strip()
+        print("Server:", login_response)
+
+        if login_response != "LOGIN_SUCCESS":
+           print("Authentication failed.")
+           return
+    
         while True:
             message = input("Message (type 'exit' to quit): ").strip()
 
