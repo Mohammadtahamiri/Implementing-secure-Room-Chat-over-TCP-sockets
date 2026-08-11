@@ -67,11 +67,56 @@ def log_message(username, message):
 def log_connection(username, ip_address, action):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO connection_logs (username, ip_address, action) VALUES (?, ?, ?)", 
-                   (username, ip_address, action))
+
+    cursor.execute(
+        "INSERT INTO connection_logs (username, ip_address, action) VALUES (?, ?, ?)",
+        (username, ip_address, action)
+    )
+
     conn.commit()
     conn.close()
 
+
+def get_messages_since(timestamp):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        SELECT username, message, timestamp
+        FROM messages
+        WHERE timestamp > ?
+        ORDER BY timestamp ASC
+        """,
+        (timestamp,)
+    )
+
+    messages = cursor.fetchall()
+    conn.close()
+
+    return messages
+def get_last_logout_time(username):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        SELECT timestamp
+        FROM connection_logs
+        WHERE username = ? AND action = 'LOGOUT'
+        ORDER BY timestamp DESC
+        LIMIT 1
+        """,
+        (username,)
+    )
+
+    result = cursor.fetchone()
+    conn.close()
+
+    if result:
+        return result[0]
+
+    return None
 def get_admin_logs():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
