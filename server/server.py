@@ -2,8 +2,15 @@ import socket
 import ssl
 import threading
 import time
-from database import init_db, register_user, authenticate_user, log_message, log_connection, get_admin_logs
-
+from database import (
+    init_db,
+    register_user,
+    authenticate_user,
+    log_message,
+    log_connection,
+    get_admin_logs,
+    get_messages_since,
+)
 HOST = '127.0.0.1'
 PORT = 12345
 CLIENT_TIMEOUT = 120

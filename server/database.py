@@ -72,6 +72,24 @@ def log_connection(username, ip_address, action):
     conn.commit()
     conn.close()
 
+    def get_messages_since(timestamp):
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+
+        cursor.execute(
+        """
+        SELECT username, message, timestamp
+        FROM messages
+        WHERE timestamp > ?
+        ORDER BY timestamp ASC
+        """,
+        (timestamp,)
+    )
+
+    messages = cursor.fetchall()
+    conn.close()
+
+    return messages
 def get_admin_logs():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
