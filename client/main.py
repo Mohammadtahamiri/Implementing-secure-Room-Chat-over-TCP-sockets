@@ -4,12 +4,48 @@ Main entry point for the socket client.
 This module connects to the server, authenticates the user,
 and provides a simple loop for sending and receiving messages.
 """
-
+import time
 from .authentication import get_credentials, build_auth_message
 from .connection import create_connection, close_connection
 from .protocol import encode_message, decode_message
 from .config import BUFFER_SIZE
 
+def reconnect(username: str, password: str):
+    """Reconnect to the server and log the user in again."""
+    while True:
+        client_socket = None
+
+        try:
+            print("Connection lost. Reconnecting...")
+            client_socket = create_connection()
+
+            # Receive AUTH_REQUIRED from the server
+            response = client_socket.recv(BUFFER_SIZE)
+            print("Server:", decode_message(response))
+
+            # Login again with the existing credentials
+            login_message = f"LOGIN {username} {password}"
+            client_socket.sendall(encode_message(login_message))
+
+            response = client_socket.recv(BUFFER_SIZE)
+            login_response = decode_message(response).strip()
+
+            print("Server:", login_response)
+
+            if login_response == "LOGIN_SUCCESS":
+                print("Reconnected successfully.")
+                return client_socket
+
+            close_connection(client_socket)
+
+        except OSError as error:
+            print(f"Reconnect failed: {error}")
+
+            if client_socket is not None:
+                close_connection(client_socket)
+
+        print("Retrying in 3 seconds...")
+        time.sleep(3)
 
 def main() -> None:
     """Run the socket client."""
