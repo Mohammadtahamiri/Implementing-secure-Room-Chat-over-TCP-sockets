@@ -78,7 +78,24 @@ def main() -> None:
         if login_response != "LOGIN_SUCCESS":
            print("Authentication failed.")
            return
-    
+        client_socket.sendall(encode_message("GET_MISSED"))
+
+        while True:
+            response = client_socket.recv(BUFFER_SIZE)
+
+            if not response:
+                break
+
+            response_text = decode_message(response).strip()
+
+            if response_text == "[MISSED_MESSAGES_START]":
+                continue
+
+            if response_text == "[MISSED_MESSAGES_END]":
+                break
+
+            print(response_text)
+
         while True:
             message = input("Message (type 'exit' to quit): ").strip()
 

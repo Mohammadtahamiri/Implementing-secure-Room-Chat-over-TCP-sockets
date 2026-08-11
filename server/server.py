@@ -10,6 +10,7 @@ from database import (
     log_connection,
     get_admin_logs,
     get_messages_since,
+    get_last_logout_time,
 )
 HOST = '127.0.0.1'
 PORT = 12345
@@ -61,6 +62,7 @@ def handle_client(client_socket, client_address):
                 username, password = parts[1], parts[2]
                 if authenticate_user(username, password):
                     current_user = username
+                    last_logout = get_last_logout_time(current_user)
                     clients[current_user] = client_socket
                     client_socket.sendall(b"LOGIN_SUCCESS\n")
                     
@@ -76,13 +78,36 @@ def handle_client(client_socket, client_address):
                 msg = client_socket.recv(1024).decode('utf-8')
                 if not msg:
                     break
-                
+
                 msg_str = msg.strip()
+
+                if msg_str.upper() == "GET_MISSED":
+                    if last_logout:
+                        missed_messages = get_messages_since(last_logout)
+
+                        client_socket.sendall(b"[MISSED_MESSAGES_START]\n")
+
+                        for sender, message, timestamp in missed_messages:
+                            if sender != current_user:
+                                client_socket.sendall(
+                                    f"[MISSED] [{timestamp}] [{sender}]: {message}\n".encode("utf-8")
+                                )
+
+                        client_socket.sendall(b"[MISSED_MESSAGES_END]\n")
+                    else:
+                        client_socket.sendall(
+                            b"[SYSTEM]: No previous session found.\n"
+                        )
+
+                    continue
 
                 current_time = time.time()
                 if current_time - last_msg_time < SPAM_LIMIT_SECONDS:
-                    client_socket.sendall(b"[SYSTEM WARNING]: You are sending messages too fast! (Anti-Spam)\n")
+                    client_socket.sendall(
+                        b"[SYSTEM WARNING]: You are sending messages too fast! (Anti-Spam)\n"
+                    )
                     continue
+
                 last_msg_time = current_time
 
                 if msg_str.upper() == "LIST":
