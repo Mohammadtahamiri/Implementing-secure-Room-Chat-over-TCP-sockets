@@ -15,7 +15,8 @@ This project implements a secure room chat application using TCP sockets in Pyth
 - Real-time message receiving
 - Background thread for receiving messages
 - Message encoding and decoding
-- Previous session message handling
+- Automatic reconnection after connection loss
+- Missed message recovery after reconnection
 
 ## Project Structure
 
