@@ -2,6 +2,7 @@ import socket
 import ssl
 import threading
 import time
+
 from database import (
     init_db,
     register_user,
@@ -12,6 +13,7 @@ from database import (
     get_messages_since,
     get_last_logout_time,
 )
+from pathlib import Path
 HOST = '127.0.0.1'
 PORT = 12345
 CLIENT_TIMEOUT = 120
@@ -145,7 +147,11 @@ def start_server():
     init_db()
     
     context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-    context.load_cert_chain(certfile="certs/server.crt", keyfile="certs/server.key")
+    BASE_DIR = Path(__file__).resolve().parent
+    CERT_FILE = BASE_DIR / "certs" / "server.crt"
+    KEY_FILE = BASE_DIR / "certs" / "server.key"
+
+    context.load_cert_chain(certfile=str(CERT_FILE), keyfile=str(KEY_FILE))
 
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.bind((HOST, PORT))
