@@ -15,23 +15,30 @@ except ImportError:
     from protocol import encode_message, decode_message
     from config import BUFFER_SIZE
 import threading
-def receive_messages(client_socket):
+import time
+def receive_messages(connection, username, password):
     while True:
         try:
-            response = client_socket.recv(BUFFER_SIZE)
+            response = connection["socket"].recv(BUFFER_SIZE)
 
+            
             if not response:
-                break
+               connection["socket"] = reconnect(username, password)
+               connection["socket"].sendall(encode_message("GET_MISSED"))
+               continue
 
             print("\n" + decode_message(response))
             print("Message (type 'exit' to quit): ", end="", flush=True)
 
         except OSError:
-            break
+               connection["socket"] = reconnect(username, password)
+               connection["socket"].sendall(encode_message("GET_MISSED"))
+
 def reconnect(username: str, password: str):
     """Reconnect to the server and log the user in again."""
     while True:
         client_socket = None
+    
 
         try:
             print("Connection lost. Reconnecting...")
@@ -68,7 +75,7 @@ def reconnect(username: str, password: str):
 def main() -> None:
     """Run the socket client."""
     client_socket = None
-
+    connection = None
     try:
         print("Connecting to server...")
         client_socket = create_connection()
@@ -117,9 +124,10 @@ def main() -> None:
 
             print(response_text)
 
+        connection = {"socket": client_socket}
         receiver_thread = threading.Thread(
            target=receive_messages, 
-        args=(client_socket,), daemon=True
+       args=(connection, username, password), daemon=True
        )
         receiver_thread.start()
 
@@ -132,8 +140,7 @@ def main() -> None:
             if not message:
                 continue
 
-            client_socket.sendall(encode_message(message))
-
+            connection["socket"].sendall(encode_message(message))
 
     except ConnectionRefusedError:
         print("Connection failed: server is not available.")
@@ -142,9 +149,12 @@ def main() -> None:
         print(f"Socket error: {error}")
 
     finally:
-        if client_socket is not None:
-            close_connection(client_socket)
-            print("Connection closed.")
+       if connection is not None:
+        close_connection(connection["socket"])
+       elif client_socket is not None:
+        close_connection(client_socket)
+
+    print("Connection closed.")
 
 
 if __name__ == "__main__":
