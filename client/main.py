@@ -4,12 +4,30 @@ Main entry point for the socket client.
 This module connects to the server, authenticates the user,
 and provides a simple loop for sending and receiving messages.
 """
-import time
-from .authentication import get_credentials, build_auth_message
-from .connection import create_connection, close_connection
-from .protocol import encode_message, decode_message
-from .config import BUFFER_SIZE
+try:
+    from .authentication import get_credentials, build_auth_message
+    from .connection import create_connection, close_connection
+    from .protocol import encode_message, decode_message
+    from .config import BUFFER_SIZE
+except ImportError:
+    from authentication import get_credentials, build_auth_message
+    from connection import create_connection, close_connection
+    from protocol import encode_message, decode_message
+    from config import BUFFER_SIZE
+import threading
+def receive_messages(client_socket):
+    while True:
+        try:
+            response = client_socket.recv(BUFFER_SIZE)
 
+            if not response:
+                break
+
+            print("\n" + decode_message(response))
+            print("Message (type 'exit' to quit): ", end="", flush=True)
+
+        except OSError:
+            break
 def reconnect(username: str, password: str):
     """Reconnect to the server and log the user in again."""
     while True:
@@ -93,8 +111,17 @@ def main() -> None:
 
             if response_text == "[MISSED_MESSAGES_END]":
                 break
+            if response_text == "[SYSTEM]: No previous session found.":
+               print(response_text)
+               break
 
             print(response_text)
+
+        receiver_thread = threading.Thread(
+           target=receive_messages, 
+        args=(client_socket,), daemon=True
+       )
+        receiver_thread.start()
 
         while True:
             message = input("Message (type 'exit' to quit): ").strip()
@@ -107,8 +134,6 @@ def main() -> None:
 
             client_socket.sendall(encode_message(message))
 
-            response = client_socket.recv(BUFFER_SIZE)
-            print("Server:", decode_message(response))
 
     except ConnectionRefusedError:
         print("Connection failed: server is not available.")

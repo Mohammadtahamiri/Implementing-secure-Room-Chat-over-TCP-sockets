@@ -5,8 +5,10 @@ This module defines how messages are encoded and decoded
 before being sent to or received from the server.
 """
 
-from .config import ENCODING
-
+try:
+    from .config import ENCODING
+except ImportError:
+    from config import ENCODING
 
 def encode_message(message: str) -> bytes:
     """Convert a text message to bytes for socket transmission."""

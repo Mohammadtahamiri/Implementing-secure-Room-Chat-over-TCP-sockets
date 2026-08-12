@@ -7,8 +7,10 @@ and connecting the client to the configured server.
 import ssl
 import socket
 
-from .config import SERVER_HOST, SERVER_PORT
-
+try:
+    from .config import SERVER_HOST, SERVER_PORT
+except ImportError:
+    from config import SERVER_HOST, SERVER_PORT
 
 def create_connection():
     """Create a secure TLS socket and connect it to the server."""
